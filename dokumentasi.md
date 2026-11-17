@@ -450,3 +450,20 @@ Status checklist harus dicatat berdasarkan hasil pengujian aktual. Keberadaan so
 ### 14.8 Batas deployment
 
 Commit source ke GitHub tidak melakukan deployment ke Supabase. Deployment, pengaturan secrets, pembuatan bucket, dan perubahan database tetap merupakan langkah terpisah yang memerlukan pemeriksaan serta persetujuan deployment.
+
+### 14.9 Interactive Image Prompt Studio UI
+
+Pembaruan UI pada branch `feature/agent-tools-v1.0` menyediakan satu antarmuka interaktif yang digunakan oleh tool `generate` dan `upload_image`.
+
+Komponen UI:
+1. Form dengan delapan input wajib: `products`, `headline`, `subheadline`, `features`, `composition`, `layout`, `background`, dan `quality`.
+2. Tombol **Generate Prompt** memanggil tool MCP `generate` menggunakan nilai form.
+3. Bagian **Prompt Preview** menampilkan `final_prompt` yang dikembalikan server.
+4. Tombol **Use Prompt in ChatGPT** mengirim prompt ke percakapan ChatGPT melalui `window.openai.sendFollowUpMessage`, agar ChatGPT dapat melanjutkan pembuatan gambar dengan kemampuan Image Generation bawaan.
+5. Bagian **Upload Generated Image** menyediakan file picker untuk PNG/JPEG/WEBP dan tombol **Upload Image to Supabase**. Upload baru dimulai setelah pengguna memilih file dan menekan tombol.
+
+Resource UI yang sama ditautkan melalui `_meta.ui.resourceUri` pada kedua tool. Tool `generate` tetap dapat dipanggil tanpa UI dan tetap mengembalikan `final_prompt`. Tool `upload_image` tetap dapat dipanggil tanpa UI dengan menyertakan file attachment sesuai schema.
+
+Implementasi UI ini menggunakan ChatGPT-specific `window.openai` API untuk `callTool`, `sendFollowUpMessage`, `uploadFile`, dan `getFileDownloadUrl`. Karena itu, jangan menganggap UI ini otomatis kompatibel dengan seluruh MCP Apps host non-ChatGPT. Dukungan API harus diverifikasi pada ChatGPT surface/workspace yang digunakan. MCP Apps bridge standar belum diimplementasikan dalam perubahan ini.
+
+Status pengujian: perubahan source telah disimpan ke branch GitHub. Deno check, MCP Inspector, dan pengujian end-to-end di ChatGPT belum dijalankan. Belum ada deployment.
