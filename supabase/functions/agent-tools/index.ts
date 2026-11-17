@@ -366,32 +366,6 @@ app.use("*", cors({
   exposeHeaders: ["Mcp-Session-Id", "Mcp-Protocol-Version"]
 }));
 
-app.use("*", async (c, next) => {
-  if (c.req.method === "OPTIONS") return c.body(null, 204);
-
-  const expectedToken = Deno.env.get("AGENT_TOOLS_BEARER_TOKEN");
-  if (!expectedToken) {
-    return c.json({ error: "Server authentication is not configured." }, 500);
-  }
-
-  const authorization = c.req.header("Authorization") || "";
-  const suppliedToken = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-  if (!suppliedToken) return c.json({ error: "Unauthorized." }, 401);
-
-  const encoder = new TextEncoder();
-  const [expectedHash, suppliedHash] = await Promise.all([
-    crypto.subtle.digest("SHA-256", encoder.encode(expectedToken)),
-    crypto.subtle.digest("SHA-256", encoder.encode(suppliedToken))
-  ]);
-  const expectedBytes = new Uint8Array(expectedHash);
-  const suppliedBytes = new Uint8Array(suppliedHash);
-  let difference = 0;
-  for (let i = 0; i < expectedBytes.length; i++) difference |= expectedBytes[i] ^ suppliedBytes[i];
-  if (difference !== 0) return c.json({ error: "Unauthorized." }, 401);
-
-  await next();
-});
-
 app.all("*", async (c) => {
   const server = createMcpServer();
   const transport = new WebStandardStreamableHTTPServerTransport({
