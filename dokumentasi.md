@@ -401,16 +401,19 @@ Bucket `image` harus sudah tersedia dan dikonfigurasi sebagai public sebelum pen
 
 Jika upload Storage berhasil tetapi insert metadata gagal, function mencoba menghapus objek Storage sebagai rollback.
 
-### 14.5 Authentication dan secrets
+### 14.5 Akses publik dan secrets
 
-Konfigurasi `supabase/config.toml` menonaktifkan verifikasi JWT bawaan gateway hanya untuk function `agent-tools`, karena function memvalidasi bearer token sendiri.
+Function `agent-tools` dikonfigurasi sebagai endpoint MCP publik:
 
-Secret yang harus dikonfigurasi sebelum deployment:
-- `AGENT_TOOLS_BEARER_TOKEN`: token acak rahasia yang sama dengan bearer token yang dikonfigurasi pada koneksi custom MCP ChatGPT.
+- Tidak menggunakan bearer token atau middleware autentikasi di dalam source function.
+- `verify_jwt = false` pada `supabase/config.toml` menonaktifkan pemeriksaan JWT oleh gateway Supabase untuk function ini.
+- Endpoint dapat dipanggil tanpa login atau token autentikasi.
+
+Secrets server-side yang tetap diperlukan untuk operasi Supabase:
 - `SUPABASE_URL`: URL project Supabase.
 - `SUPABASE_SECRET_KEYS` dengan property `default`, atau `SUPABASE_SERVICE_ROLE_KEY`: credential server-side untuk operasi Storage dan database.
 
-Jangan menyimpan nilai secret di GitHub, source code, UI, atau respons MCP. Jangan menggunakan token contoh atau placeholder sebagai credential produksi. Rotasi token jika pernah terekspos.
+Credential Supabase tetap disimpan di environment/secrets Supabase dan tidak dikirim ke ChatGPT, UI, atau client. Akses endpoint MCP sendiri bersifat publik sesuai konfirmasi pemilik proyek.
 
 ### 14.6 MCP transport dan endpoint
 
@@ -440,7 +443,6 @@ Handler menerima request pada seluruh path function. Tetap verifikasi URL deploy
 - [ ] Metadata tersimpan ke `generated_images`.
 - [ ] Public URL dapat dibuka tanpa signed token.
 - [ ] Kegagalan insert memicu cleanup Storage.
-- [ ] Request tanpa bearer token yang valid ditolak.
 - [ ] Uji end-to-end dilakukan di ChatGPT.
 
 Status checklist harus dicatat berdasarkan hasil pengujian aktual. Keberadaan source code bukan bukti function sudah ter-deploy atau sudah kompatibel dengan ChatGPT.
