@@ -39,7 +39,7 @@ const uploadUiHtml = [
   "const statusEl=document.getElementById('status');",
   "const api=window.openai;",
   "const toolInput=api?.toolInput||{};",
-  "const prompt=typeof toolInput.prompt==='string'?toolInput.prompt:'';",
+  "let prompt=typeof toolInput.prompt==='string'?toolInput.prompt:'';window.addEventListener('message',event=>{if(event.source!==window.parent)return;const message=event.data;if(message?.method==='ui/notifications/tool-input'&&typeof message.params?.prompt==='string')prompt=message.params.prompt;});",
   "function status(message,success){statusEl.className=success?'success':'';statusEl.textContent=message;}",
   "button.addEventListener('click',()=>{if(!api?.uploadFile||!api?.getFileDownloadUrl||!api?.callTool){",
   "if(api?.sendFollowUpMessage){api.sendFollowUpMessage({prompt:'Saya ingin mengunggah gambar hasil generasi. Mohon minta saya melampirkan file gambar PNG, JPEG, atau WEBP, lalu panggil tool upload_image dengan attachment tersebut.'});status('Silakan lampirkan gambar pada percakapan ChatGPT.',false);}",
@@ -59,7 +59,7 @@ const uploadUiHtml = [
   "}catch(error){status(error?.message||'Upload gagal. Silakan coba kembali.',false);}finally{button.disabled=false;picker.value='';}",
   "});",
   "</script></body></html>"
-].join("\\n");
+].join("\n");
 
 function buildFinalPrompt(input: {
   products: string;
@@ -114,7 +114,7 @@ function buildFinalPrompt(input: {
     "- Aspect ratio: 4:5.",
     "- High-resolution commercial advertising quality.",
     "- Ready for social media publication."
-  ].join("\\n");
+  ].join("\n");
 }
 
 function isAllowedDownloadUrl(rawUrl: string): URL {
@@ -217,7 +217,7 @@ function createMcpServer() {
 
   server.registerTool("generate", {
     title: "Generate commercial image prompt",
-    description: "Build the final commercial advertising image prompt from all eight manually supplied variables. It does not call an image-generation API. Return the final prompt for ChatGPT to use with its built-in image generation capability.",
+    description: "Build the final commercial advertising image prompt from all eight manually supplied variables. It does not call an image-generation API. Return the final prompt for ChatGPT to use with its built-in image generation capability. After ChatGPT finishes generating the image, call upload_image without an image argument to show the user the upload control; do not upload until the user selects a file.",
     inputSchema: {
       products: z.string().min(1).max(5000),
       headline: z.string().min(1).max(2000),
@@ -227,6 +227,11 @@ function createMcpServer() {
       layout: z.string().min(1).max(2000),
       background: z.string().min(1).max(3000),
       quality: z.string().min(1).max(3000)
+    },
+    outputSchema: {
+      success: z.boolean(),
+      final_prompt: z.string(),
+      output: z.object({ width: z.number(), height: z.number(), aspect_ratio: z.string() })
     },
     annotations: {
       readOnlyHint: true,
@@ -267,6 +272,18 @@ function createMcpServer() {
         file_name: z.string().optional()
       }).optional(),
       prompt: z.string().max(10000).optional()
+    },
+    outputSchema: {
+      success: z.boolean(),
+      status: z.string(),
+      message: z.string().optional(),
+      image: z.object({
+        id: z.union([z.string(), z.number()]).optional(),
+        image_url: z.string(),
+        storage_path: z.string(),
+        mime_type: z.string(),
+        created_at: z.string().optional()
+      }).optional()
     },
     annotations: {
       readOnlyHint: false,
