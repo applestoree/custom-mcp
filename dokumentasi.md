@@ -338,3 +338,113 @@ Audit berikutnya harus memeriksa source aktual, bukan hanya mengandalkan daftar 
 
 - Dokumentasi ini menggabungkan referensi awal Supabase dengan referensi resmi OpenAI untuk ChatGPT MCP dan Apps SDK.
 - Tidak ada perubahan kode function, konfigurasi Supabase, secrets, atau deployment yang dilakukan melalui pembaruan dokumentasi ini.
+
+---
+
+## 14. Implementasi `agent-tools` — Image Prompt dan Upload
+
+Status bagian ini: source implementasi tersedia pada branch `feature/agent-tools-v1.0`. Source belum di-deploy dan belum dinyatakan lulus pengujian end-to-end.
+
+### 14.1 File
+
+```text
+supabase/
+├── config.toml
+└── functions/
+    └── agent-tools/
+        └── index.ts
+```
+
+Function lama `chatgpt-image-upload-mcp` tetap dipertahankan sebagai referensi dan tidak diubah oleh implementasi ini.
+
+### 14.2 MCP Tools
+
+| Tool | Tujuan |
+|---|---|
+| `generate` | Menyusun prompt final dari delapan variables manual: `products`, `headline`, `subheadline`, `features`, `composition`, `layout`, `background`, dan `quality`. |
+| `upload_image` | Menampilkan UI pemilihan file ketika dipanggil tanpa file, lalu menerima file attachment ChatGPT dan menyimpan gambar ke Supabase. |
+
+`generate` tidak memanggil API image generation. ChatGPT menggunakan `final_prompt` untuk membuat gambar melalui kemampuan Image Generation yang tersedia di percakapan.
+
+Setelah gambar dibuat, model harus memanggil `upload_image` tanpa argumen `image` agar UI upload ditampilkan. Upload baru dilakukan setelah pengguna memilih file dan menekan tombol upload.
+
+### 14.3 ChatGPT file transfer dan UI
+
+UI menggunakan ChatGPT-specific file helpers:
+
+- `window.openai.uploadFile(file)` untuk memasukkan file yang dipilih pengguna ke alur file ChatGPT.
+- `window.openai.getFileDownloadUrl({ fileId })` untuk memperoleh URL download sementara.
+- `window.openai.callTool("upload_image", args)` untuk memanggil tool upload dari UI.
+- `_meta["openai/fileParams"]` untuk mendeklarasikan parameter file pada tool.
+
+Schema file mendeklarasikan empat properti `download_url`, `file_id`, `mime_type`, dan `file_name`; dua properti pertama wajib dan dua terakhir opsional, sesuai referensi resmi OpenAI.
+
+Referensi:
+- https://developers.openai.com/plugins/build/chatgpt-ui
+- https://developers.openai.com/plugins/reference
+
+Catatan: pengguna perlu memilih file gambar hasil generasi (misalnya file yang sudah disimpan atau disediakan dalam file picker). Widget tidak menganggap gambar yang hanya terlihat dalam percakapan otomatis dapat dibaca oleh server.
+
+### 14.4 Storage dan database
+
+| Properti | Nilai |
+|---|---|
+| Bucket | `image` |
+| Access | Public |
+| Table | `generated_images` |
+| Kolom | `prompt`, `image_url`, `storage_path`, `mime_type` |
+| Folder objek | `chatgpt/` |
+| Format | PNG, JPEG, WEBP |
+| Batas ukuran | 10 MB |
+
+Bucket `image` harus sudah tersedia dan dikonfigurasi sebagai public sebelum pengujian upload. Function tidak membuat bucket atau mengubah schema database secara otomatis.
+
+Jika upload Storage berhasil tetapi insert metadata gagal, function mencoba menghapus objek Storage sebagai rollback.
+
+### 14.5 Authentication dan secrets
+
+Konfigurasi `supabase/config.toml` menonaktifkan verifikasi JWT bawaan gateway hanya untuk function `agent-tools`, karena function memvalidasi bearer token sendiri.
+
+Secret yang harus dikonfigurasi sebelum deployment:
+- `AGENT_TOOLS_BEARER_TOKEN`: token acak rahasia yang sama dengan bearer token yang dikonfigurasi pada koneksi custom MCP ChatGPT.
+- `SUPABASE_URL`: URL project Supabase.
+- `SUPABASE_SECRET_KEYS` dengan property `default`, atau `SUPABASE_SERVICE_ROLE_KEY`: credential server-side untuk operasi Storage dan database.
+
+Jangan menyimpan nilai secret di GitHub, source code, UI, atau respons MCP. Jangan menggunakan token contoh atau placeholder sebagai credential produksi. Rotasi token jika pernah terekspos.
+
+### 14.6 MCP transport dan endpoint
+
+Server membuat instance `McpServer` dan `WebStandardStreamableHTTPServerTransport` baru untuk setiap request, dengan `sessionIdGenerator: undefined` untuk pola stateless.
+
+Endpoint deployment yang direncanakan:
+
+```text
+https://<project-ref>.supabase.co/functions/v1/agent-tools
+```
+
+Handler menerima request pada seluruh path function. Tetap verifikasi URL deployment, HTTP methods, CORS, authentication, initialize, dan tools/list menggunakan MCP Inspector serta koneksi ChatGPT. Jangan menambahkan suffix `/mcp` kecuali hasil pengujian routing membuktikannya diperlukan.
+
+### 14.7 Pengujian sebelum deployment produksi
+
+- [ ] Deno check / validasi sintaks berhasil.
+- [ ] MCP Inspector berhasil melakukan initialize.
+- [ ] `tools/list` menampilkan `generate` dan `upload_image`.
+- [ ] `generate` mengembalikan prompt lengkap dengan delapan variables.
+- [ ] ChatGPT dapat menggunakan prompt untuk membuat gambar.
+- [ ] Pemanggilan `upload_image` tanpa file menampilkan UI.
+- [ ] File picker dan ChatGPT file helpers bekerja.
+- [ ] File PNG, JPEG, dan WEBP diterima.
+- [ ] File di atas 10 MB ditolak.
+- [ ] File dengan signature yang tidak cocok ditolak.
+- [ ] File tersimpan ke bucket `image`.
+- [ ] Metadata tersimpan ke `generated_images`.
+- [ ] Public URL dapat dibuka tanpa signed token.
+- [ ] Kegagalan insert memicu cleanup Storage.
+- [ ] Request tanpa bearer token yang valid ditolak.
+- [ ] Uji end-to-end dilakukan di ChatGPT.
+
+Status checklist harus dicatat berdasarkan hasil pengujian aktual. Keberadaan source code bukan bukti function sudah ter-deploy atau sudah kompatibel dengan ChatGPT.
+
+### 14.8 Batas deployment
+
+Commit source ke GitHub tidak melakukan deployment ke Supabase. Deployment, pengaturan secrets, pembuatan bucket, dan perubahan database tetap merupakan langkah terpisah yang memerlukan pemeriksaan serta persetujuan deployment.
