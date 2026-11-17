@@ -5,6 +5,7 @@ import { WebStandardStreamableHTTPServerTransport } from "npm:@modelcontextproto
 import { Hono } from "npm:hono@^4.9.7";
 import { cors } from "npm:hono@^4.9.7/cors";
 import { z } from "npm:zod@^4.1.13";
+import { buildFinalPrompt } from "./buildFinalPrompt.ts";
 
 const FUNCTION_NAME = "agent-tools";
 const SERVER_VERSION = "1.0.0";
@@ -52,62 +53,6 @@ const uploadUiHtml = [
   "picker.addEventListener('change',async()=>{const file=picker.files?.[0];if(!file)return;if(!['image/png','image/jpeg','image/webp'].includes(file.type)){status('Format tidak didukung. Gunakan PNG, JPEG, atau WEBP.',false);picker.value='';return;}if(file.size>10*1024*1024){status('Ukuran gambar melebihi batas 10 MB.',false);picker.value='';return;}uploadButton.disabled=true;status('Mengirim file ke ChatGPT…',false);try{const uploaded=await api.uploadFile(file);const fileId=uploaded?.fileId;if(!fileId)throw new Error('ChatGPT tidak mengembalikan file ID.');const fileUrl=await api.getFileDownloadUrl({fileId});if(!fileUrl?.downloadUrl)throw new Error('URL download sementara tidak tersedia.');const result=await api.callTool('upload_image',{image:{download_url:fileUrl.downloadUrl,file_id:fileId,mime_type:file.type,file_name:file.name},prompt:lastPrompt});const data=result?.structuredContent||{};if(data.success&&data.image?.image_url){status('Upload berhasil. Public URL: '+data.image.image_url,true);}else{const message=(result?.content||[]).map(x=>x.text||'').filter(Boolean).join(' ');throw new Error(message||'Upload gagal.');}}catch(error){status(error?.message||'Upload gagal. Silakan coba kembali.',false);}finally{uploadButton.disabled=false;picker.value='';}});",
   "</script></body></html>"
 ].join("\n");
-
-function buildFinalPrompt(input: {
-  products: string;
-  headline: string;
-  subheadline: string;
-  features: string;
-  composition: string;
-  layout: string;
-  background: string;
-  quality: string;
-}): string {
-  return [
-    "Create a professional commercial advertising poster featuring:",
-    "",
-    "**PRODUCT:** " + input.products,
-    "",
-    "**HEADLINE:** " + input.headline,
-    "",
-    "**SUBHEADLINE:** " + input.subheadline,
-    "",
-    "**PRODUCT FEATURES:**",
-    input.features,
-    "",
-    "**COMPOSITION:**",
-    input.composition,
-    "",
-    "**LAYOUT:**",
-    input.layout,
-    "",
-    "**BACKGROUND:**",
-    input.background,
-    "",
-    "**VISUAL QUALITY:**",
-    input.quality,
-    "",
-    "## Design Requirements",
-    "",
-    "- Create a premium, professional advertising design.",
-    "- Make the selected product the primary visual focus.",
-    "- Maintain realistic product proportions and details.",
-    "- Use professional commercial photography aesthetics.",
-    "- Ensure clear visual hierarchy.",
-    "- Make headline and subheadline visually readable.",
-    "- Arrange all elements harmoniously.",
-    "- Avoid unnecessary decorative elements.",
-    "- Do not create, redraw, or generate any logo.",
-    "- Leave the top-left area suitable for a small logo overlay.",
-    "",
-    "## Output Requirements",
-    "",
-    "- Image dimensions: 1080 × 1350 pixels.",
-    "- Aspect ratio: 4:5.",
-    "- High-resolution commercial advertising quality.",
-    "- Ready for social media publication."
-  ].join("\n");
-}
 
 function isAllowedDownloadUrl(rawUrl: string): URL {
   const parsed = new URL(rawUrl);
