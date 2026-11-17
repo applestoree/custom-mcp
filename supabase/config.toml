@@ -1,4 +1,3 @@
 [functions.agent-tools]
-# The function validates its own static Bearer token in AGENT_TOOLS_BEARER_TOKEN.
-# Keep the token secret in Supabase Functions secrets; never commit it here.
+# Public MCP endpoint; Supabase JWT gateway verification is disabled for this function.
 verify_jwt = false
